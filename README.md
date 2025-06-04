@@ -16,6 +16,8 @@ Baseline CTR Model Comparison
 7. DIN (Deep Interest Network)
 8. CTNet (Continual Transfer Network)
 
+示例训练脚本 `experiments/train.py` 提供 `--model` 参数，可直接选择 `DeepFM`、`FFM`、`WideDeep` 或 `DCN` 进行实验。
+
 ## 数据预处理
 - **连续特征缺失**: 统一填充为 0, 并增加二元指示特征。
 - **类别特征缺失**: 填充为特殊字符串 `"unknown"`。
@@ -64,7 +66,8 @@ BenchmarkCTR/
    ```bash
    pip install -r requirements.txt
    ```
-3. 运行示例训练脚本：
+3. 运行示例训练脚本（以 DeepFM 为例）：
    ```bash
-   python experiments/train.py --data data/criteo.csv --epochs 1
+   python experiments/train.py --data data/criteo.csv --epochs 1 \
+       --model DeepFM --output outputs/result.csv
    ```
