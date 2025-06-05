@@ -118,6 +118,15 @@ def main(args: argparse.Namespace) -> None:
 
     numeric_cols = [c for c in df.columns if c.startswith("I")]
     categorical_cols = [c for c in df.columns if c.startswith("C")]
+    if not numeric_cols and not categorical_cols:
+        exclude_cols = {"click", "label", "treatment", "conversion", "visit"}
+        for col in df.columns:
+            if col.lower() in exclude_cols:
+                continue
+            if pd.api.types.is_numeric_dtype(df[col]):
+                numeric_cols.append(col)
+            else:
+                categorical_cols.append(col)
 
     df_train, scaler, rare_maps = fit_preprocess(df_train, numeric_cols, categorical_cols)
     df_val = apply_preprocess(df_val, numeric_cols, categorical_cols, scaler, rare_maps)
