@@ -8,7 +8,8 @@ Baseline CTR Model Comparison
 在相同数据集 Criteo Uplift Modeling Dataset 上, 采用统一的预处理与评估流程, 对比以下八种模型的点击率预测性能:
 
 1. FTRL (Follow-The-Regularized-Leader)
-2. FFM (Field-aware Factorization Machine)
+2. FFM (Field-aware Factorization Machine, optional - requires a DeepCTR-Torch
+   version that provides this model)
 3. Wide & Deep
 4. DeepFM
 5. Deep & Cross Network (DCN)
@@ -16,7 +17,7 @@ Baseline CTR Model Comparison
 7. DIN (Deep Interest Network)
 8. CTNet (Continual Transfer Network)
 
-示例训练脚本 `experiments/train.py` 提供 `--model` 参数，可直接选择 `DeepFM`、`FFM`、`WideDeep` 或 `DCN` 进行实验，并支持指定学习率、L2 正则化和 Dropout。
+示例训练脚本 `experiments/train.py` 提供 `--model` 参数，可直接选择 `DeepFM`、`WideDeep` 或 `DCN` 进行实验；若安装了支持 FFM 的 DeepCTR-Torch，也可以选择 `FFM`。脚本支持指定学习率、L2 正则化和 Dropout。
 
 ## 数据预处理
 - **连续特征缺失**: 统一填充为 0, 并增加二元指示特征。

@@ -5,7 +5,11 @@ import pandas as pd
 import torch
 import time
 from deepctr_torch.inputs import DenseFeat, SparseFeat
-from deepctr_torch.models import DCN, DeepFM, FFM, WideDeep
+from deepctr_torch.models import DCN, DeepFM, WideDeep
+try:
+    from deepctr_torch.models import FFM
+except ImportError:  # pragma: no cover - optional dependency may be missing
+    FFM = None
 from deepctr_torch.utils import Dataset
 from sklearn.metrics import (
     average_precision_score,
@@ -30,6 +34,11 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
             device=device,
         )
     if name.lower() == "ffm":
+        if FFM is None:
+            raise ImportError(
+                "FFM model is not available. Please install a compatible "
+                "version of deepctr-torch that provides FFM."
+            )
         return FFM(
             linear_feature_columns=feature_columns,
             dnn_feature_columns=feature_columns,
@@ -170,7 +179,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CTR model training")
     parser.add_argument("--data", type=str, required=True, help="Path to CSV dataset")
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--model", type=str, default="DeepFM", help="Model name: DeepFM/FFM/WideDeep/DCN")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="DeepFM",
+        help=(
+            "Model name: DeepFM/WideDeep/DCN (FFM if supported by your "
+            "DeepCTR-Torch installation)"
+        ),
+    )
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization")
     parser.add_argument("--dropout", type=float, default=0.5, help="DNN dropout")
