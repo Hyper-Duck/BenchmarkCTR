@@ -1,16 +1,26 @@
 """Training script skeleton for CTR models using DeepCTR-torch."""
 import argparse
 import os
+import sys
 import pandas as pd
 import torch
 import time
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from deepctr_torch.inputs import DenseFeat, SparseFeat
-from deepctr_torch.models import DCN, DeepFM, WideDeep
+from deepctr_torch.models import DCN, DeepFM, WDL
 try:
     from deepctr_torch.models import FFM
 except ImportError:  # pragma: no cover - optional dependency may be missing
     FFM = None
-from deepctr_torch.utils import Dataset
+from models import (
+    CTRDataset,
+    CTNetModel,
+    DINModel,
+    DMRModel,
+    FTRLModel,
+    FTRLProximal,
+)
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -48,7 +58,7 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
             device=device,
         )
     if name.lower() == "widedeep":
-        return WideDeep(
+        return WDL(
             linear_feature_columns=feature_columns,
             dnn_feature_columns=feature_columns,
             task="binary",
@@ -68,6 +78,14 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
             l2_reg_embedding=l2,
             device=device,
         )
+    if name.lower() == "ftrl":
+        return FTRLModel(feature_columns)
+    if name.lower() == "dmr":
+        return DMRModel(feature_columns, dropout=dropout)
+    if name.lower() == "din":
+        return DINModel(feature_columns, dropout=dropout)
+    if name.lower() == "ctnet":
+        return CTNetModel(feature_columns, dropout=dropout)
     raise ValueError(f"Unknown model: {name}")
 
 
@@ -114,9 +132,9 @@ def main(args: argparse.Namespace) -> None:
         for col in categorical_cols
     ]
 
-    train_dataset = Dataset(df_train, feature_columns, label_name="click")
-    val_dataset = Dataset(df_val, feature_columns, label_name="click")
-    test_dataset = Dataset(df_test, feature_columns, label_name="click")
+    train_dataset = CTRDataset(df_train, feature_columns, label_name="click")
+    val_dataset = CTRDataset(df_val, feature_columns, label_name="click")
+    test_dataset = CTRDataset(df_test, feature_columns, label_name="click")
 
     train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=0)
@@ -126,7 +144,10 @@ def main(args: argparse.Namespace) -> None:
     model = get_model(args.model, feature_columns, device, args.dropout, args.l2)
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
+    if args.model.lower() == "ftrl":
+        optimizer = FTRLProximal(model.parameters(), lr=args.lr, l2=args.l2)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
     loss_fn = torch.nn.BCELoss()
 
     model.train()
@@ -184,8 +205,8 @@ if __name__ == "__main__":
         type=str,
         default="DeepFM",
         help=(
-            "Model name: DeepFM/WideDeep/DCN (FFM if supported by your "
-            "DeepCTR-Torch installation)"
+            "Model name: DeepFM/WideDeep/DCN/FTRL/DMR/DIN/CTNet "
+            "(FFM if supported by your DeepCTR-Torch installation)"
         ),
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
