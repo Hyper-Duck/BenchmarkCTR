@@ -56,8 +56,9 @@ def fit_preprocess(
         df[col] = df[col].where(~df[col].isin(rare_maps[col]), "rare")
 
     scaler = StandardScaler()
-    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-
+    if numeric_cols:
+        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+    
     return df, scaler, rare_maps
 
 
@@ -74,6 +75,7 @@ def apply_preprocess(
     for col in categorical_cols:
         df[col] = df[col].where(~df[col].isin(rare_maps[col]), "rare")
 
-    df[numeric_cols] = scaler.transform(df[numeric_cols])
+    if numeric_cols:
+        df[numeric_cols] = scaler.transform(df[numeric_cols])
     return df
 
