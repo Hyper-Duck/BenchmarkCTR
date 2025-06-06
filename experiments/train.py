@@ -128,6 +128,18 @@ def main(args: argparse.Namespace) -> None:
             else:
                 categorical_cols.append(col)
 
+    label_candidates = ["click", "label", "conversion", "visit"]
+    label_col = None
+    for name in label_candidates:
+        if name in df.columns:
+            label_col = name
+            break
+    if label_col is None:
+        raise ValueError(
+            "Could not determine label column. Expected one of: "
+            + ", ".join(label_candidates)
+        )
+
     df_train, scaler, rare_maps = fit_preprocess(df_train, numeric_cols, categorical_cols)
     df_val = apply_preprocess(df_val, numeric_cols, categorical_cols, scaler, rare_maps)
     df_test = apply_preprocess(df_test, numeric_cols, categorical_cols, scaler, rare_maps)
@@ -141,9 +153,9 @@ def main(args: argparse.Namespace) -> None:
         for col in categorical_cols
     ]
 
-    train_dataset = CTRDataset(df_train, feature_columns, label_name="click")
-    val_dataset = CTRDataset(df_val, feature_columns, label_name="click")
-    test_dataset = CTRDataset(df_test, feature_columns, label_name="click")
+    train_dataset = CTRDataset(df_train, feature_columns, label_name=label_col)
+    val_dataset = CTRDataset(df_val, feature_columns, label_name=label_col)
+    test_dataset = CTRDataset(df_test, feature_columns, label_name=label_col)
 
     train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=0)
