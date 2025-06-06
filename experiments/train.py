@@ -32,6 +32,27 @@ from torch.utils.data import DataLoader
 from preprocess.utils import apply_preprocess, fit_preprocess, split_dataframe
 
 
+def _to_model_input(model, features, device):
+    """Convert a batch from CTRDataset to the format expected by the model."""
+
+    dnn_models = (DeepFM, WDL, DCN)
+    if FFM is not None:
+        dnn_models = dnn_models + (FFM,)
+
+    if isinstance(model, dnn_models):
+        tensors = []
+        for name in model.feature_index:
+            t = features[name]
+            if t.dim() == 1:
+                t = t.unsqueeze(1)
+            tensors.append(t)
+        return torch.cat(tensors, dim=1).to(device)
+
+    for k, v in features.items():
+        features[k] = v.to(device)
+    return features
+
+
 def get_model(name: str, feature_columns, device, dropout: float, l2: float):
     if name.lower() == "deepfm":
         return DeepFM(
@@ -98,6 +119,7 @@ def evaluate(model, data_loader, device):
     with torch.no_grad():
         for batch in data_loader:
             x, y = batch
+            x = _to_model_input(model, x, device)
             y_pred = model(x)
             preds.append(y_pred.cpu())
             labels.append(y)
@@ -154,8 +176,12 @@ def main(args: argparse.Namespace) -> None:
     ]
 
     train_dataset = CTRDataset(df_train, feature_columns, label_name=label_col)
-    val_dataset = CTRDataset(df_val, feature_columns, label_name=label_col)
-    test_dataset = CTRDataset(df_test, feature_columns, label_name=label_col)
+    val_dataset = CTRDataset(
+        df_val, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
+    )
+    test_dataset = CTRDataset(
+        df_test, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
+    )
 
     train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=0)
@@ -178,6 +204,7 @@ def main(args: argparse.Namespace) -> None:
         for batch in train_loader:
             optimizer.zero_grad()
             x, y = batch
+            x = _to_model_input(model, x, device)
             y_pred = model(x)
             loss = loss_fn(y_pred.squeeze(-1), y.float().to(device))
             loss.backward()
