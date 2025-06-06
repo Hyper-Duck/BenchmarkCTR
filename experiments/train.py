@@ -7,7 +7,8 @@ import torch
 import time
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from deepctr_torch.inputs import DenseFeat, SparseFeat
+from collections import OrderedDict
+from deepctr_torch.inputs import DenseFeat, SparseFeat, build_input_features
 from deepctr_torch.models import DCN, DeepFM, WDL
 try:
     from deepctr_torch.models import FFM
@@ -30,6 +31,8 @@ from sklearn.metrics import (
 from torch.utils.data import DataLoader
 
 from preprocess.utils import apply_preprocess, fit_preprocess, split_dataframe
+
+DEEPCTR_MODELS = {"deepfm", "ffm", "widedeep", "dcn"}
 
 
 def get_model(name: str, feature_columns, device, dropout: float, l2: float):
@@ -89,7 +92,24 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
     raise ValueError(f"Unknown model: {name}")
 
 
-def evaluate(model, data_loader, device):
+def dict_to_tensor(feature_dict: dict, feature_index: OrderedDict, device: torch.device) -> torch.Tensor:
+    """Convert a batch of feature dicts to a dense tensor ordered by feature_index."""
+    batch_size = next(iter(feature_dict.values())).shape[0]
+    input_dim = max(e for _, e in feature_index.values())
+    X = torch.zeros(batch_size, input_dim, dtype=torch.float32, device=device)
+    for name, (start, end) in feature_index.items():
+        val = feature_dict[name]
+        if val.dim() == 1:
+            val = val.unsqueeze(1)
+        X[:, start:end] = val.float().to(device)
+    return X
+
+
+def move_features_to_device(feature_dict: dict, device: torch.device) -> dict:
+    return {k: v.to(device) for k, v in feature_dict.items()}
+
+
+def evaluate(model, data_loader, device, feature_index=None):
     """Evaluate model on data loader and return metrics and inference time."""
 
     model.eval()
@@ -98,9 +118,16 @@ def evaluate(model, data_loader, device):
     with torch.no_grad():
         for batch in data_loader:
             x, y = batch
+            if isinstance(x, dict):
+                x = move_features_to_device(x, device)
+                if feature_index is not None:
+                    x = dict_to_tensor(x, feature_index, device)
+            else:
+                x = x.to(device)
+            y = y.to(device)
             y_pred = model(x)
             preds.append(y_pred.cpu())
-            labels.append(y)
+            labels.append(y.cpu())
     infer_time = time.time() - start
 
     preds = torch.cat(preds).numpy()
@@ -164,6 +191,8 @@ def main(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = get_model(args.model, feature_columns, device, args.dropout, args.l2)
     model.to(device)
+    is_deepctr = args.model.lower() in DEEPCTR_MODELS
+    feature_index = build_input_features(feature_columns) if is_deepctr else None
 
     if args.model.lower() == "ftrl":
         optimizer = FTRLProximal(model.parameters(), lr=args.lr, l2=args.l2)
@@ -178,19 +207,26 @@ def main(args: argparse.Namespace) -> None:
         for batch in train_loader:
             optimizer.zero_grad()
             x, y = batch
+            if isinstance(x, dict):
+                x = move_features_to_device(x, device)
+                if is_deepctr:
+                    x = dict_to_tensor(x, feature_index, device)
+            else:
+                x = x.to(device)
+            y = y.float().to(device)
             y_pred = model(x)
-            loss = loss_fn(y_pred.squeeze(-1), y.float().to(device))
+            loss = loss_fn(y_pred.squeeze(-1), y)
             loss.backward()
             optimizer.step()
         train_time = time.time() - start_train
         total_train_time += train_time
 
-        val_auc, val_ll, val_pr, val_brier, val_infer = evaluate(model, val_loader, device)
+        val_auc, val_ll, val_pr, val_brier, val_infer = evaluate(model, val_loader, device, feature_index if is_deepctr else None)
         print(
             f"Epoch {epoch+1} - AUC {val_auc:.4f} LogLoss {val_ll:.4f} PR-AUC {val_pr:.4f}"
         )
 
-    test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device)
+    test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device, feature_index if is_deepctr else None)
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     pd.DataFrame(
