@@ -5,6 +5,7 @@ import sys
 import pandas as pd
 import torch
 import time
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from deepctr_torch.inputs import DenseFeat, SparseFeat
@@ -110,14 +111,14 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
     raise ValueError(f"Unknown model: {name}")
 
 
-def evaluate(model, data_loader, device):
+def evaluate(model, data_loader, device, desc: str = "Eval"):
     """Evaluate model on data loader and return metrics and inference time."""
 
     model.eval()
     preds, labels = [], []
     start = time.time()
     with torch.no_grad():
-        for batch in data_loader:
+        for batch in tqdm(data_loader, desc=desc, leave=False):
             x, y = batch
             x = _to_model_input(model, x, device)
             y_pred = model(x)
@@ -188,6 +189,10 @@ def main(args: argparse.Namespace) -> None:
     test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False, num_workers=0)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        print(f"Using CUDA device: {torch.cuda.get_device_name(device)}")
+    else:
+        print("Using CPU for training")
     model = get_model(args.model, feature_columns, device, args.dropout, args.l2)
     model.to(device)
 
@@ -201,7 +206,8 @@ def main(args: argparse.Namespace) -> None:
     total_train_time = 0.0
     for epoch in range(args.epochs):
         start_train = time.time()
-        for batch in train_loader:
+        progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}", unit="batch")
+        for batch in progress:
             optimizer.zero_grad()
             x, y = batch
             x = _to_model_input(model, x, device)
@@ -209,15 +215,16 @@ def main(args: argparse.Namespace) -> None:
             loss = loss_fn(y_pred.squeeze(-1), y.float().to(device))
             loss.backward()
             optimizer.step()
+            progress.set_postfix(loss=f"{loss.item():.4f}")
         train_time = time.time() - start_train
         total_train_time += train_time
 
-        val_auc, val_ll, val_pr, val_brier, val_infer = evaluate(model, val_loader, device)
+        val_auc, val_ll, val_pr, val_brier, val_infer = evaluate(model, val_loader, device, desc="Val")
         print(
             f"Epoch {epoch+1} - AUC {val_auc:.4f} LogLoss {val_ll:.4f} PR-AUC {val_pr:.4f}"
         )
 
-    test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device)
+    test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device, desc="Test")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     pd.DataFrame(
