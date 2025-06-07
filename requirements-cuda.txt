@@ -9,3 +9,4 @@ deepctr-torch
 pandas
 numpy
 scikit-learn
+tqdm
