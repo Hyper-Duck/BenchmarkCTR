@@ -2,9 +2,11 @@
 import argparse
 import os
 import sys
+import random
 import pandas as pd
 import torch
 import time
+import numpy as np
 from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -136,8 +138,16 @@ def evaluate(model, data_loader, device, desc: str = "Eval"):
 
 
 def main(args: argparse.Namespace) -> None:
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     df = pd.read_csv(args.data)
-    df_train, df_val, df_test = split_dataframe(df)
+    df_train, df_val, df_test = split_dataframe(df, random_state=args.seed)
 
     numeric_cols = [c for c in df.columns if c.startswith("I")]
     categorical_cols = [c for c in df.columns if c.startswith("C")]
@@ -184,9 +194,21 @@ def main(args: argparse.Namespace) -> None:
         df_test, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=0)
-    test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False, num_workers=0)
+    loader_gen = torch.Generator()
+    loader_gen.manual_seed(args.seed)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=1024,
+        shuffle=True,
+        num_workers=0,
+        generator=loader_gen,
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=1024, shuffle=False, num_workers=0, generator=loader_gen
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=1024, shuffle=False, num_workers=0, generator=loader_gen
+    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
@@ -201,6 +223,9 @@ def main(args: argparse.Namespace) -> None:
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
     loss_fn = torch.nn.BCELoss()
+
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(args.log_file), exist_ok=True)
 
     model.train()
     total_train_time = 0.0
@@ -223,6 +248,25 @@ def main(args: argparse.Namespace) -> None:
         print(
             f"Epoch {epoch+1} - AUC {val_auc:.4f} LogLoss {val_ll:.4f} PR-AUC {val_pr:.4f}"
         )
+        pd.DataFrame(
+            [
+                {
+                    "epoch": epoch + 1,
+                    "val_auc": val_auc,
+                    "val_logloss": val_ll,
+                    "val_pr_auc": val_pr,
+                }
+            ]
+        ).to_csv(
+            args.log_file,
+            mode="a",
+            index=False,
+            header=not os.path.exists(args.log_file),
+        )
+        ckpt_path = os.path.join(
+            args.checkpoint_dir, f"{args.model}_epoch_{epoch+1}.pt"
+        )
+        torch.save(model.state_dict(), ckpt_path)
 
     test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device, desc="Test")
 
@@ -248,7 +292,12 @@ def main(args: argparse.Namespace) -> None:
                 "train_time": total_train_time,
             }
         ]
-    ).to_csv(args.output, index=False)
+    ).to_csv(
+        args.output,
+        mode="a",
+        index=False,
+        header=not os.path.exists(args.output),
+    )
 
 
 if __name__ == "__main__":
@@ -267,6 +316,24 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization")
     parser.add_argument("--dropout", type=float, default=0.5, help="DNN dropout")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=2025,
+        help="Random seed for reproducibility",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default="outputs/checkpoints",
+        help="Directory to save model checkpoints",
+    )
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default="logs/train_metrics.csv",
+        help="Path to save per-epoch validation metrics",
+    )
     parser.add_argument(
         "--output", type=str, default="outputs/result.csv", help="Path to save metrics CSV"
     )
