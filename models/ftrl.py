@@ -74,7 +74,10 @@ class FTRLModel(nn.Module):
 
         out = self.bias.expand(batch_size, 1)
         if self.dense_layer is not None:
-            dense = torch.cat([x[c.name].float() for c in self.dense_feats], dim=-1)
+            dense = torch.cat(
+                [x[c.name].float().unsqueeze(1) for c in self.dense_feats],
+                dim=1,
+            )
             out = out + self.dense_layer(dense)
         for c in self.sparse_feats:
             emb = self.embeddings[c.name](x[c.name].long())
