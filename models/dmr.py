@@ -12,10 +12,13 @@ class DMRModel(nn.Module):
         hidden_units = hidden_units or [256, 128, 64]
         self.sparse_feats = [c for c in feature_columns if isinstance(c, SparseFeat)]
         self.dense_feats = [c for c in feature_columns if isinstance(c, DenseFeat)]
+        if not self.sparse_feats and not self.dense_feats:
+            raise ValueError("DMRModel requires at least one feature")
         self.embeddings = nn.ModuleDict(
             {c.name: nn.Embedding(c.vocabulary_size, c.embedding_dim) for c in self.sparse_feats}
         )
-        input_dim = len(self.dense_feats) + len(self.sparse_feats) * self.sparse_feats[0].embedding_dim
+        embed_dim = self.sparse_feats[0].embedding_dim if self.sparse_feats else 1
+        input_dim = len(self.dense_feats) + len(self.sparse_feats) * embed_dim
         layers = []
         prev_dim = input_dim
         for u in hidden_units:
@@ -27,8 +30,13 @@ class DMRModel(nn.Module):
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, x):
-        dense = torch.cat([x[c.name].float() for c in self.dense_feats], dim=-1) if self.dense_feats else None
-        sparse = [self.embeddings[c.name](x[c.name].long()).squeeze(1) for c in self.sparse_feats]
-        concat = torch.cat(([dense] if dense is not None else []) + sparse, dim=-1)
+        dense = (
+            torch.cat([x[c.name].float().unsqueeze(1) for c in self.dense_feats], dim=1)
+            if self.dense_feats
+            else None
+        )
+        sparse = [self.embeddings[c.name](x[c.name].long()) for c in self.sparse_feats]
+        parts = ([] if dense is None else [dense]) + sparse
+        concat = torch.cat(parts, dim=1)
         out = self.mlp(concat)
         return torch.sigmoid(out.squeeze(-1))
