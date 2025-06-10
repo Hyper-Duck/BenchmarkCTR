@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 import time
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from deepctr_torch.inputs import DenseFeat, SparseFeat
@@ -120,7 +120,7 @@ def evaluate(model, data_loader, device, desc: str = "Eval"):
     preds, labels = [], []
     start = time.time()
     with torch.no_grad():
-        for batch in tqdm(data_loader, desc=desc, leave=False):
+        for batch in tqdm(data_loader, desc=desc, leave=False, dynamic_ncols=True, file=sys.stdout):
             x, y = batch
             x = _to_model_input(model, x, device)
             y_pred = model(x)
@@ -231,7 +231,13 @@ def main(args: argparse.Namespace) -> None:
     total_train_time = 0.0
     for epoch in range(args.epochs):
         start_train = time.time()
-        progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}", unit="batch")
+        progress = tqdm(
+            train_loader,
+            desc=f"Epoch {epoch+1}/{args.epochs}",
+            unit="batch",
+            dynamic_ncols=True,
+            file=sys.stdout,
+        )
         for batch in progress:
             optimizer.zero_grad()
             x, y = batch
