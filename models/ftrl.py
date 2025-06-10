@@ -65,9 +65,19 @@ class FTRLModel(nn.Module):
         self.bias = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
-        out = self.bias.expand(x[self.sparse_feats[0].name].shape[0], 1)
+        if self.sparse_feats:
+            batch_size = x[self.sparse_feats[0].name].shape[0]
+        elif self.dense_feats:
+            batch_size = x[self.dense_feats[0].name].shape[0]
+        else:
+            raise ValueError("FTRLModel requires at least one feature")
+
+        out = self.bias.expand(batch_size, 1)
         if self.dense_layer is not None:
-            dense = torch.cat([x[c.name].float() for c in self.dense_feats], dim=-1)
+            dense = torch.cat(
+                [x[c.name].float().unsqueeze(1) for c in self.dense_feats],
+                dim=1,
+            )
             out = out + self.dense_layer(dense)
         for c in self.sparse_feats:
             emb = self.embeddings[c.name](x[c.name].long())
