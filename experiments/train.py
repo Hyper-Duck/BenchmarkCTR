@@ -42,8 +42,6 @@ def _to_model_input(model, features, device):
     dnn_models = (DeepFM, WDL, DCN)
     if FFM is not None:
         dnn_models = dnn_models + (FFM,)
-    else:
-        dnn_models = dnn_models + (FFMModel,)
 
     if isinstance(model, dnn_models):
         tensors = []
