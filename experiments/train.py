@@ -23,6 +23,7 @@ from models import (
     DMRModel,
     FTRLModel,
     FTRLProximal,
+    FFMModel,
 )
 from sklearn.metrics import (
     average_precision_score,
@@ -41,6 +42,8 @@ def _to_model_input(model, features, device):
     dnn_models = (DeepFM, WDL, DCN)
     if FFM is not None:
         dnn_models = dnn_models + (FFM,)
+    else:
+        dnn_models = dnn_models + (FFMModel,)
 
     if isinstance(model, dnn_models):
         tensors = []
@@ -68,19 +71,16 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
             device=device,
         )
     if name.lower() == "ffm":
-        if FFM is None:
-            raise ImportError(
-                "FFM model is not available. Please install a compatible "
-                "version of deepctr-torch that provides FFM."
+        if FFM is not None:
+            return FFM(
+                linear_feature_columns=feature_columns,
+                dnn_feature_columns=feature_columns,
+                task="binary",
+                dnn_hidden_units=[256, 128, 64],
+                l2_reg_embedding=l2,
+                device=device,
             )
-        return FFM(
-            linear_feature_columns=feature_columns,
-            dnn_feature_columns=feature_columns,
-            task="binary",
-            dnn_hidden_units=[256, 128, 64],
-            l2_reg_embedding=l2,
-            device=device,
-        )
+        return FFMModel(feature_columns)
     if name.lower() == "widedeep":
         return WDL(
             linear_feature_columns=feature_columns,
