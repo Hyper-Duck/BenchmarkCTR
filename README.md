@@ -66,12 +66,7 @@ BenchmarkCTR/
    ```bash
    pip install -r requirements.txt
    ```
-3. 如需提前得到处理后的拆分数据，可执行：
-   ```bash
-   python -m preprocess.preprocess_criteo --input data/criteo.csv \
-       --output-dir data/processed
-   ```
-4. 运行示例训练脚本（以 DeepFM 为例）：
+3. 运行示例训练脚本（以 DeepFM 为例）：
    ```bash
     python experiments/train.py --data data/criteo.csv --epochs 1 \
         --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 \
