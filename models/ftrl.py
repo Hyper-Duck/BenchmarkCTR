@@ -43,8 +43,9 @@ class FTRLProximal(Optimizer):
                 mask = torch.abs(z) <= l1
                 p.data[mask] = 0.0
                 denom = (beta + n.sqrt()) / alpha + l2
-                p.data[~mask] = - (z[~mask] - torch.sign(z[~mask]) * l1) / denom[~mask]
-                p.data.mul_(lr)
+                p.data[~mask] = -lr * (
+                    z[~mask] - torch.sign(z[~mask]) * l1
+                ) / denom[~mask]
         return loss
 
 
