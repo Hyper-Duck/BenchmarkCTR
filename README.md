@@ -54,7 +54,7 @@ Baseline CTR Model Comparison
 BenchmarkCTR/
 ├─ data/           # 原始数据存放位置
 ├─ preprocess/     # 数据预处理模块
-├─ models/         # 额外自定义模型(可选)
+├─ models/         # 额外自定义模型
 ├─ experiments/    # 训练脚本
 ├─ logs/           # 训练日志
 ├─ outputs/        # 模型权重与评估结果
@@ -66,12 +66,7 @@ BenchmarkCTR/
    ```bash
    pip install -r requirements.txt
    ```
-3. 如需提前得到处理后的拆分数据，可执行：
-   ```bash
-   python -m preprocess.preprocess_criteo --input data/criteo.csv \
-       --output-dir data/processed
-   ```
-4. 运行示例训练脚本（以 DeepFM 为例）：
+3. 运行示例训练脚本（以 DeepFM 为例）：
    ```bash
     python experiments/train.py --data data/criteo.csv --epochs 1 \
         --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 \
@@ -79,4 +74,3 @@ BenchmarkCTR/
         --seed 2025 --checkpoint-dir outputs/checkpoints \
         --log-file logs/train_metrics.csv
     ```
-运行多次训练时，指定的 `--output` CSV 会自动追加新行而不会覆盖已有内容。
