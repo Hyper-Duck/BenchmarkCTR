@@ -73,4 +73,14 @@ BenchmarkCTR/
         --output outputs/result.csv \
         --seed 2025 --checkpoint-dir outputs/checkpoints \
         --log-file logs/train_metrics.csv
-    ```
+   ```
+4. 若需从已有模型继续训练，可传入 `--start-from-checkpoint` 并将 `--epochs`
+   设为额外训练的轮数：
+   ```bash
+    python experiments/train.py --data data/criteo.csv --epochs 2 \
+        --model DeepFM --start-from-checkpoint outputs/checkpoints/DeepFM_epoch_1.pt \
+        --lr 1e-3 --l2 1e-5 --dropout 0.5 \
+        --output outputs/result.csv \
+        --seed 2025 --checkpoint-dir outputs/checkpoints \
+        --log-file logs/train_metrics.csv
+   ```
