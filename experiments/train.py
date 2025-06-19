@@ -222,16 +222,33 @@ def main(args: argparse.Namespace) -> None:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
     loss_fn = torch.nn.BCELoss()
 
+    start_epoch = 0
+    if args.start_from_checkpoint:
+        ckpt = torch.load(args.start_from_checkpoint, map_location=device)
+        if isinstance(ckpt, dict) and "model_state" in ckpt:
+            model.load_state_dict(ckpt["model_state"])
+            if "optimizer_state" in ckpt:
+                optimizer.load_state_dict(ckpt["optimizer_state"])
+            start_epoch = ckpt.get("epoch", 0)
+        else:
+            model.load_state_dict(ckpt)
+            import re
+
+            m = re.search(r"_epoch_(\d+)\.pt$", os.path.basename(args.start_from_checkpoint))
+            if m:
+                start_epoch = int(m.group(1))
+
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     os.makedirs(os.path.dirname(args.log_file), exist_ok=True)
 
     model.train()
     total_train_time = 0.0
-    for epoch in range(args.epochs):
+    total_epochs = start_epoch + args.epochs
+    for epoch in range(start_epoch, total_epochs):
         start_train = time.time()
         progress = tqdm(
             train_loader,
-            desc=f"Epoch {epoch+1}/{args.epochs}",
+            desc=f"Epoch {epoch+1}/{total_epochs}",
             unit="batch",
             dynamic_ncols=True,
             file=sys.stdout,
@@ -270,7 +287,14 @@ def main(args: argparse.Namespace) -> None:
         ckpt_path = os.path.join(
             args.checkpoint_dir, f"{args.model}_epoch_{epoch+1}.pt"
         )
-        torch.save(model.state_dict(), ckpt_path)
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "epoch": epoch + 1,
+            },
+            ckpt_path,
+        )
 
     test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device, desc="Test")
 
@@ -279,7 +303,7 @@ def main(args: argparse.Namespace) -> None:
         [
             {
                 "model": args.model,
-                "epochs": args.epochs,
+                "epochs": total_epochs,
                 "lr": args.lr,
                 "l2": args.l2,
                 "dropout": args.dropout,
@@ -331,6 +355,12 @@ if __name__ == "__main__":
         type=str,
         default="outputs/checkpoints",
         help="Directory to save model checkpoints",
+    )
+    parser.add_argument(
+        "--start-from-checkpoint",
+        type=str,
+        default=None,
+        help="Path to a checkpoint file to resume training",
     )
     parser.add_argument(
         "--log-file",
