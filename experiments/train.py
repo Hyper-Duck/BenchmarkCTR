@@ -217,7 +217,13 @@ def main(args: argparse.Namespace) -> None:
     model.to(device)
 
     if args.model.lower() == "ftrl":
-        optimizer = FTRLProximal(model.parameters(), lr=args.lr, l2=args.l2)
+        optimizer = FTRLProximal(
+            model.parameters(),
+            alpha=args.alpha,
+            beta=args.beta,
+            l1=args.l1,
+            l2=args.l2,
+        )
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
     loss_fn = torch.nn.BCELoss()
@@ -299,8 +305,30 @@ def main(args: argparse.Namespace) -> None:
     test_auc, test_ll, test_pr, test_brier, test_infer = evaluate(model, test_loader, device, desc="Test")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
-    pd.DataFrame(
-        [
+    if args.model.lower() == "ftrl":
+        results = [
+            {
+                "model": args.model,
+                "epochs": total_epochs,
+                "alpha": args.alpha,
+                "beta": args.beta,
+                "l1": args.l1,
+                "l2": args.l2,
+                "val_auc": val_auc,
+                "val_logloss": val_ll,
+                "val_pr_auc": val_pr,
+                "val_brier": val_brier,
+                "val_infer_time": val_infer,
+                "test_auc": test_auc,
+                "test_logloss": test_ll,
+                "test_pr_auc": test_pr,
+                "test_brier": test_brier,
+                "test_infer_time": test_infer,
+                "train_time": total_train_time,
+            }
+        ]
+    else:
+        results = [
             {
                 "model": args.model,
                 "epochs": total_epochs,
@@ -320,7 +348,7 @@ def main(args: argparse.Namespace) -> None:
                 "train_time": total_train_time,
             }
         ]
-    ).to_csv(
+    pd.DataFrame(results).to_csv(
         args.output,
         mode="a",
         index=False,
@@ -342,8 +370,11 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization")
     parser.add_argument("--dropout", type=float, default=0.5, help="DNN dropout")
+    parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization")
+    parser.add_argument("--alpha", type=float, default=0.1, help="FTRL alpha")
+    parser.add_argument("--beta", type=float, default=1.0, help="FTRL beta")
+    parser.add_argument("--l1", type=float, default=1.0, help="FTRL L1 regularization")
     parser.add_argument(
         "--seed",
         type=int,
@@ -371,4 +402,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", type=str, default="outputs/result.csv", help="Path to save metrics CSV"
     )
-    main(parser.parse_args())
+    args = parser.parse_args()
+    if args.model.lower() == "ftrl" and args.output == "outputs/result.csv":
+        args.output = "outputs/ftrl.csv"
+    main(args)
