@@ -194,18 +194,35 @@ def main(args: argparse.Namespace) -> None:
 
     loader_gen = torch.Generator()
     loader_gen.manual_seed(args.seed)
+    num_workers = min(16, os.cpu_count())
+    pin_memory = True
+    batch_size = 2048
+
     train_loader = DataLoader(
         train_dataset,
-        batch_size=1024,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
         generator=loader_gen,
     )
+
     val_loader = DataLoader(
-        val_dataset, batch_size=1024, shuffle=False, num_workers=0, generator=loader_gen
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        generator=loader_gen,
     )
+
     test_loader = DataLoader(
-        test_dataset, batch_size=1024, shuffle=False, num_workers=0, generator=loader_gen
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        generator=loader_gen,
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -75,3 +75,7 @@ BenchmarkCTR/
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/train_metrics.csv --start-from-checkpoint outputs/checkpoints/DeepFM_epoch_2.pt
    ```
+5. FTLR 模型与其他模型略有不同，其使用 `alpha`、`beta`、`l1` 和 `l2` 4个参数。示例训练脚本：
+   ```bash
+   python experiments/train.py --data data/criteo.csv --epochs 1 --model FTRL --alpha 0.05 --beta 1.0 --l1 1.0 --l2 1e-5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/ftrl_log.csv
+   ```
