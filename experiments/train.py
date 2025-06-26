@@ -57,13 +57,25 @@ def _to_model_input(model, features, device):
     return features
 
 
-def get_model(name: str, feature_columns, device, dropout: float, l2: float):
+def get_model(
+    name: str,
+    feature_columns,
+    device,
+    dropout: float,
+    l2: float,
+    hidden_units: list[int],
+    cross_num: int,
+    memory_hops: int,
+    conv_layers: int,
+    attention_hidden_size: int | None,
+    embed_dim: int,
+):
     if name.lower() == "deepfm":
         return DeepFM(
             linear_feature_columns=feature_columns,
             dnn_feature_columns=feature_columns,
             task="binary",
-            dnn_hidden_units=[256, 128, 64],
+            dnn_hidden_units=hidden_units,
             dnn_dropout=dropout,
             l2_reg_embedding=l2,
             device=device,
@@ -74,17 +86,17 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
                 linear_feature_columns=feature_columns,
                 dnn_feature_columns=feature_columns,
                 task="binary",
-                dnn_hidden_units=[256, 128, 64],
+                dnn_hidden_units=hidden_units,
                 l2_reg_embedding=l2,
                 device=device,
             )
-        return FFMModel(feature_columns)
+        return FFMModel(feature_columns, embedding_dim=embed_dim)
     if name.lower() == "widedeep":
         return WDL(
             linear_feature_columns=feature_columns,
             dnn_feature_columns=feature_columns,
             task="binary",
-            dnn_hidden_units=[256, 128, 64],
+            dnn_hidden_units=hidden_units,
             dnn_dropout=dropout,
             l2_reg_embedding=l2,
             device=device,
@@ -94,8 +106,8 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
             linear_feature_columns=feature_columns,
             dnn_feature_columns=feature_columns,
             task="binary",
-            dnn_hidden_units=[256, 128, 64],
-            cross_num=2,
+            dnn_hidden_units=hidden_units,
+            cross_num=cross_num,
             dnn_dropout=dropout,
             l2_reg_embedding=l2,
             device=device,
@@ -103,11 +115,11 @@ def get_model(name: str, feature_columns, device, dropout: float, l2: float):
     if name.lower() == "ftrl":
         return FTRLModel(feature_columns)
     if name.lower() == "dmr":
-        return DMRModel(feature_columns, dropout=dropout)
+        return DMRModel(feature_columns, hidden_units=hidden_units, memory_hops=memory_hops, dropout=dropout)
     if name.lower() == "din":
-        return DINModel(feature_columns, dropout=dropout)
+        return DINModel(feature_columns, hidden_units=hidden_units, attention_hidden_size=attention_hidden_size, dropout=dropout)
     if name.lower() == "ctnet":
-        return CTNetModel(feature_columns, dropout=dropout)
+        return CTNetModel(feature_columns, hidden_units=hidden_units, conv_layers=conv_layers, dropout=dropout)
     raise ValueError(f"Unknown model: {name}")
 
 
@@ -179,8 +191,10 @@ def main(args: argparse.Namespace) -> None:
     vocab_size = {col: df_train[col].nunique() + 1 for col in categorical_cols}
 
     feature_columns = [DenseFeat(col, 1) for col in numeric_cols]
+    hidden_units = [int(x) for x in str(args.dnn_hidden_units).replace(",", " ").split() if x]
+
     feature_columns += [
-        SparseFeat(col, vocabulary_size=vocab_size[col], embedding_dim=8)
+        SparseFeat(col, vocabulary_size=vocab_size[col], embedding_dim=args.embed_dim)
         for col in categorical_cols
     ]
 
@@ -230,7 +244,19 @@ def main(args: argparse.Namespace) -> None:
         print(f"Using CUDA device: {torch.cuda.get_device_name(device)}")
     else:
         print("Using CPU for training")
-    model = get_model(args.model, feature_columns, device, args.dropout, args.l2)
+    model = get_model(
+        args.model,
+        feature_columns,
+        device,
+        args.dropout,
+        args.l2,
+        hidden_units,
+        args.cross_num,
+        args.memory_hops,
+        args.conv_layers,
+        args.attention_hidden_size,
+        args.embed_dim,
+    )
     model.to(device)
 
     if args.model.lower() == "ftrl":
@@ -389,6 +415,43 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--dropout", type=float, default=0.5, help="DNN dropout")
     parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization")
+
+    parser.add_argument(
+        "--dnn-hidden-units",
+        type=str,
+        default="256 128 64",
+        help="Space separated list for DNN hidden units",
+    )
+    parser.add_argument(
+        "--embed-dim",
+        type=int,
+        default=8,
+        help="Embedding dimension for categorical features",
+    )
+    parser.add_argument(
+        "--cross-num",
+        type=int,
+        default=2,
+        help="Number of cross layers for DCN",
+    )
+    parser.add_argument(
+        "--memory-hops",
+        type=int,
+        default=1,
+        help="Number of memory hops for DMR",
+    )
+    parser.add_argument(
+        "--conv-layers",
+        type=int,
+        default=3,
+        help="Number of convolutional layers for CTNet",
+    )
+    parser.add_argument(
+        "--attention-hidden-size",
+        type=int,
+        default=None,
+        help="Attention hidden size for DIN",
+    )
     parser.add_argument("--alpha", type=float, default=0.1, help="FTRL alpha")
     parser.add_argument("--beta", type=float, default=1.0, help="FTRL beta")
     parser.add_argument("--l1", type=float, default=1.0, help="FTRL L1 regularization")

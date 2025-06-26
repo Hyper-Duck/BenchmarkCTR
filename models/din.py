@@ -7,7 +7,13 @@ from deepctr_torch.inputs import SparseFeat, DenseFeat
 class DINModel(nn.Module):
     """Simplified DIN with attention over sparse embeddings."""
 
-    def __init__(self, feature_columns, hidden_units: List[int] | None = None, dropout: float = 0.5):
+    def __init__(
+        self,
+        feature_columns,
+        hidden_units: List[int] | None = None,
+        attention_hidden_size: int | None = None,
+        dropout: float = 0.5,
+    ):
         super().__init__()
         hidden_units = hidden_units or [256, 128, 64]
         self.sparse_feats = [c for c in feature_columns if isinstance(c, SparseFeat)]
@@ -19,8 +25,11 @@ class DINModel(nn.Module):
             {c.name: nn.Embedding(c.vocabulary_size, embed_dim) for c in self.sparse_feats}
         )
         input_dim = len(self.dense_feats) + len(self.sparse_feats) * embed_dim
+        att_dim = attention_hidden_size or input_dim
         self.attention = nn.Sequential(
-            nn.Linear(input_dim, input_dim),
+            nn.Linear(input_dim, att_dim),
+            nn.ReLU(),
+            nn.Linear(att_dim, input_dim),
             nn.Sigmoid(),
         )
         layers = []

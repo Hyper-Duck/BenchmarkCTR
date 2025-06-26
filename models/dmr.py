@@ -7,7 +7,13 @@ from deepctr_torch.inputs import SparseFeat, DenseFeat
 class DMRModel(nn.Module):
     """Simplified Deep Match to Rank model using an MLP."""
 
-    def __init__(self, feature_columns, hidden_units: List[int] | None = None, dropout: float = 0.5):
+    def __init__(
+        self,
+        feature_columns,
+        hidden_units: List[int] | None = None,
+        memory_hops: int = 1,
+        dropout: float = 0.5,
+    ):
         super().__init__()
         hidden_units = hidden_units or [256, 128, 64]
         self.sparse_feats = [c for c in feature_columns if isinstance(c, SparseFeat)]
@@ -21,11 +27,12 @@ class DMRModel(nn.Module):
         input_dim = len(self.dense_feats) + len(self.sparse_feats) * embed_dim
         layers = []
         prev_dim = input_dim
-        for u in hidden_units:
-            layers.append(nn.Linear(prev_dim, u))
-            layers.append(nn.ReLU())
-            layers.append(nn.Dropout(dropout))
-            prev_dim = u
+        for _ in range(max(1, int(memory_hops))):
+            for u in hidden_units:
+                layers.append(nn.Linear(prev_dim, u))
+                layers.append(nn.ReLU())
+                layers.append(nn.Dropout(dropout))
+                prev_dim = u
         layers.append(nn.Linear(prev_dim, 1))
         self.mlp = nn.Sequential(*layers)
 
