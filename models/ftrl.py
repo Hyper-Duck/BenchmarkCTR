@@ -70,9 +70,9 @@ class FTRLProximal(Optimizer):
                 z.add_(grad - sigma * p.data)
                 # update weight
                 sign = z.sign()
-                mask = sign * z.abs().lt(l1)
+                cond = z.abs() <= l1
                 p.data = torch.where(
-                    mask,
+                    cond,
                     torch.zeros_like(p),
                     -(z - sign * l1) / ((beta + n.sqrt()) / alpha + l2)
                 )
