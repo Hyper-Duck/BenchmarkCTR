@@ -1,0 +1,76 @@
+$COMMON = @(
+  "--data";       "data/criteo.csv";        
+  "--epochs";     "3";
+  "--lr";         "1e-3";
+  "--l2";         "1e-5";
+  "--dropout";    "0.5";
+  "--seed";       "2025"
+)
+
+# 1. Wide & Deep: 2/3/4 层
+foreach($units in @("256 128","256 128 64","256 128 64 32")) {
+  & python.exe "experiments/train.py" $COMMON `
+    --model WideDeep `
+    --dnn-hidden-units $units `
+    --output "outputs/widedeep_units.csv"
+}
+
+# 2. DeepFM: 三种 embedding 维度
+foreach ($ed in @(8,16,32)) {
+  & python "experiments/train.py" $COMMON `
+    --model DeepFM `
+    --embed-dim $ed `
+    --output "outputs/deepfm_emb.csv"
+}
+
+# 3. DCN: cross 层数 1/2/3
+foreach($c in @(1,2,3)) {
+  & python "experiments/train.py" $COMMON `
+    --model DCN `
+    --cross-num $c `
+    --dnn-hidden-units "256 128 64" `
+    --output "outputs/dcn_c.csv"
+}
+
+# 4. DIN: attention hidden size 32/64/128
+foreach($hs in @(32,64,128)) {
+  & python "experiments/train.py" $COMMON `
+    --model DIN `
+    --attention-hidden-size $hs `
+    --output "outputs/din_hs.csv"
+}
+
+# 5. DMR: hops 1/2
+foreach($h in @(1,2)) {
+  & python "experiments/train.py" $COMMON `
+    --model DMR `
+    --memory-hops $h `
+    --output "outputs/dmr_h.csv"
+}
+
+# 6. CTNet: conv 层数 2/3/4
+foreach($cl in @(2,3,4)) {
+  & python "experiments/train.py" $COMMON `
+    --model CTNet `
+    --conv-layers $cl `
+    --output "outputs/ctnet_cl.csv"
+}
+
+# 7. FFM: latent factor k=4/8/16
+foreach($k in @(4,8,16)) {
+  & python "experiments/train.py" $COMMON `
+    --model FFM `
+    --embed-dim $k `
+    --output "outputs/ffm_k.csv"
+}
+
+# 8. FTRL: alpha=0.01/0.05/0.1
+foreach($a in @(0.01,0.05,0.1)) {
+  & python "experiments/train.py" $COMMON `
+    --model FTRL `
+    --alpha $a `
+    --beta 1.0 `
+    --l1 1.0 `
+    --l2 1e-5 `
+    --output "outputs/ftrl_a.csv"
+}

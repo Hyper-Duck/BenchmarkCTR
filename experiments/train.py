@@ -1,4 +1,4 @@
-"""Training script skeleton for CTR models using DeepCTR-torch."""
+"""Training script for CTR models using DeepCTR-torch."""
 import argparse
 import os
 import sys
@@ -208,7 +208,7 @@ def main(args: argparse.Namespace) -> None:
 
     loader_gen = torch.Generator()
     loader_gen.manual_seed(args.seed)
-    num_workers = min(16, os.cpu_count())
+    num_workers = 0
     pin_memory = True
     batch_size = 2048
 
@@ -414,7 +414,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="DeepFM",
+        required=True,
         help=(
             "Model name: DeepFM/WideDeep/DCN/FTRL/DMR/DIN/CTNet "
             "(FFM if supported by your DeepCTR-Torch installation)"
