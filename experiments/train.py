@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from deepctr_torch.inputs import DenseFeat, SparseFeat
-from deepctr_torch.models import DCN, DeepFM, WDL
+from deepctr_torch.models import DCN, WDL
 try:
     from deepctr_torch.models import FFM
 except ImportError:  # pragma: no cover - optional dependency may be missing
@@ -24,6 +24,7 @@ from models import (
     FTRLModel,
     FTRLProximal,
     FFMModel,
+    DeepFMModel,
 )
 from sklearn.metrics import (
     average_precision_score,
@@ -39,7 +40,7 @@ from preprocess.utils import apply_preprocess, fit_preprocess, split_dataframe
 def _to_model_input(model, features, device):
     """Convert a batch from CTRDataset to the format expected by the model."""
 
-    dnn_models = (DeepFM, WDL, DCN)
+    dnn_models = (WDL, DCN)
     if FFM is not None:
         dnn_models = dnn_models + (FFM,)
 
@@ -71,14 +72,11 @@ def get_model(
     embed_dim: int,
 ):
     if name.lower() == "deepfm":
-        return DeepFM(
-            linear_feature_columns=feature_columns,
-            dnn_feature_columns=feature_columns,
-            task="binary",
-            dnn_hidden_units=hidden_units,
-            dnn_dropout=dropout,
-            l2_reg_embedding=l2,
-            device=device,
+        return DeepFMModel(
+            feature_columns,
+            embedding_dim=embed_dim,
+            hidden_units=hidden_units,
+            dropout=dropout,
         )
     if name.lower() == "ffm":
         if FFM is not None:
