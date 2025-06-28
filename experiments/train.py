@@ -145,7 +145,7 @@ def evaluate(model, data_loader, device, desc: str = "Eval"):
     return auc, ll, pr_auc, brier, infer_time
 
 
-def main(args: argparse.Namespace) -> None:
+def main(args: argparse.Namespace, explicit: set[str]) -> None:
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -347,15 +347,12 @@ def main(args: argparse.Namespace) -> None:
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     if args.model.lower() == "ftrl":
-        results = [
+        result = {"model": args.model, "epochs": total_epochs}
+        for name in ["alpha", "beta", "l1", "l2", "seed"]:
+            if name in explicit:
+                result[name] = getattr(args, name)
+        result.update(
             {
-                "model": args.model,
-                "epochs": total_epochs,
-                "alpha": args.alpha,
-                "beta": args.beta,
-                "l1": args.l1,
-                "l2": args.l2,
-                "seed": args.seed,
                 "val_auc": val_auc,
                 "val_logloss": val_ll,
                 "val_pr_auc": val_pr,
@@ -368,22 +365,26 @@ def main(args: argparse.Namespace) -> None:
                 "test_infer_time": test_infer,
                 "train_time": total_train_time,
             }
-        ]
+        )
+        results = [result]
     else:
-        results = [
+        result = {"model": args.model, "epochs": total_epochs}
+        for name in [
+            "lr",
+            "l2",
+            "dropout",
+            "dnn_hidden_units",
+            "embed_dim",
+            "cross_num",
+            "memory_hops",
+            "conv_layers",
+            "attention_hidden_size",
+            "seed",
+        ]:
+            if name in explicit:
+                result[name] = getattr(args, name)
+        result.update(
             {
-                "model": args.model,
-                "epochs": total_epochs,
-                "lr": args.lr,
-                "l2": args.l2,
-                "dropout": args.dropout,
-                "dnn_hidden_units": args.dnn_hidden_units,
-                "embed_dim": args.embed_dim,
-                "cross_num": args.cross_num,
-                "memory_hops": args.memory_hops,
-                "conv_layers": args.conv_layers,
-                "attention_hidden_size": args.attention_hidden_size,
-                "seed": args.seed,
                 "val_auc": val_auc,
                 "val_logloss": val_ll,
                 "val_pr_auc": val_pr,
@@ -396,7 +397,8 @@ def main(args: argparse.Namespace) -> None:
                 "test_infer_time": test_infer,
                 "train_time": total_train_time,
             }
-        ]
+        )
+        results = [result]
     pd.DataFrame(results).to_csv(
         args.output,
         mode="a",
@@ -489,6 +491,15 @@ if __name__ == "__main__":
         "--output", type=str, default="outputs/result.csv", help="Path to save metrics CSV"
     )
     args = parser.parse_args()
+    argv = sys.argv[1:]
+    explicit: set[str] = set()
+    for action in parser._actions:
+        if not action.option_strings or action.dest == "help":
+            continue
+        for option in action.option_strings:
+            if option in argv:
+                explicit.add(action.dest)
+                break
     if args.model.lower() == "ftrl" and args.output == "outputs/result.csv":
         args.output = "outputs/ftrl.csv"
-    main(args)
+    main(args, explicit)
