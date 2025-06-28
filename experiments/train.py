@@ -491,13 +491,15 @@ if __name__ == "__main__":
         "--output", type=str, default="outputs/result.csv", help="Path to save metrics CSV"
     )
     args = parser.parse_args()
-    explicit = {
-        action.dest
-        for action in parser._actions
-        if action.option_strings
-        and action.dest != "help"
-        and (action.required or getattr(args, action.dest) != action.default)
-    }
+    argv = sys.argv[1:]
+    explicit: set[str] = set()
+    for action in parser._actions:
+        if not action.option_strings or action.dest == "help":
+            continue
+        for option in action.option_strings:
+            if option in argv:
+                explicit.add(action.dest)
+                break
     if args.model.lower() == "ftrl" and args.output == "outputs/result.csv":
         args.output = "outputs/ftrl.csv"
     main(args, explicit)
