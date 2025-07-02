@@ -1,7 +1,7 @@
 from typing import List
 import torch
 from torch import nn
-from deepctr_torch.inputs import SparseFeat, DenseFeat
+from .features import SparseFeat, DenseFeat
 
 class CTNetModel(nn.Module):
     """Continual Transfer Network with CNN-based feature extractor."""

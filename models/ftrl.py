@@ -2,7 +2,7 @@ import math
 from typing import List, Iterable
 import torch
 from torch import nn
-from deepctr_torch.inputs import SparseFeat, DenseFeat
+from .features import SparseFeat, DenseFeat
 from torch.optim.optimizer import Optimizer, required
 
 

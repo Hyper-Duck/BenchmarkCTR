@@ -1,11 +1,11 @@
-from typing import List
 import torch
 from torch import nn
+from typing import List
 from .features import SparseFeat, DenseFeat
 
 
-class DeepFMModel(nn.Module):
-    """Minimal DeepFM implementation honoring feature embedding_dim."""
+class WideDeepModel(nn.Module):
+    """Simple Wide & Deep model implemented in PyTorch."""
 
     def __init__(
         self,
@@ -19,14 +19,17 @@ class DeepFMModel(nn.Module):
         self.sparse_feats = [c for c in feature_columns if isinstance(c, SparseFeat)]
         self.dense_feats = [c for c in feature_columns if isinstance(c, DenseFeat)]
         if not self.sparse_feats and not self.dense_feats:
-            raise ValueError("DeepFMModel requires at least one feature")
-        self.embed_dim = embedding_dim
+            raise ValueError("WideDeepModel requires at least one feature")
+
+        # linear (wide) part
         self.linear_sparse = nn.ModuleDict(
             {c.name: nn.Embedding(c.vocabulary_size, 1) for c in self.sparse_feats}
         )
         self.linear_dense = nn.ParameterDict(
             {c.name: nn.Parameter(torch.zeros(1)) for c in self.dense_feats}
         )
+
+        # deep part embeddings
         self.embeddings = nn.ModuleDict(
             {c.name: nn.Embedding(c.vocabulary_size, embedding_dim) for c in self.sparse_feats}
         )
@@ -35,6 +38,7 @@ class DeepFMModel(nn.Module):
         )
         for p in self.dense_params.values():
             nn.init.xavier_uniform_(p.view(1, -1))
+
         self.bias = nn.Parameter(torch.zeros(1))
 
         input_dim = (len(self.sparse_feats) + len(self.dense_feats)) * embedding_dim
@@ -60,16 +64,9 @@ class DeepFMModel(nn.Module):
             out = out + self.linear_dense[c.name] * x[c.name].float().unsqueeze(1)
 
         embeddings = [self.embeddings[c.name](x[c.name].long()) for c in self.sparse_feats]
-        embeddings += [
-            x[c.name].float().unsqueeze(1) * self.dense_params[c.name]
-            for c in self.dense_feats
-        ]
+        embeddings += [x[c.name].float().unsqueeze(1) * self.dense_params[c.name] for c in self.dense_feats]
         if embeddings:
             stack = torch.stack(embeddings, dim=1)
-            square_of_sum = torch.sum(stack, dim=1) ** 2
-            sum_of_square = torch.sum(stack ** 2, dim=1)
-            fm_out = 0.5 * torch.sum(square_of_sum - sum_of_square, dim=1, keepdim=True)
-            out = out + fm_out
             dnn_input = stack.view(batch_size, -1)
             out = out + self.dnn(dnn_input)
         return torch.sigmoid(out.squeeze(-1))

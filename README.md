@@ -28,7 +28,8 @@ Baseline CTR Model Comparison
 - **数据划分**: 随机打乱后按 70/15/15 划分为训练集、验证集和测试集。
 
 ## 实验实现
-- 框架: Python + PyTorch + DeepCTR
+- 框架: Python + PyTorch
+- Wide & Deep 与 DCN 均由本项目自行实现，无需依赖 DeepCTR
 - 训练参数:
   - `batch_size = 1024`
   - `embedding_dim = 8`

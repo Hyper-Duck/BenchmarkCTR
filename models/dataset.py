@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from deepctr_torch.inputs import SparseFeat, DenseFeat
+from .features import SparseFeat, DenseFeat
 
 class CTRDataset(Dataset):
     """Simple Dataset turning dataframe rows into feature dicts for models."""

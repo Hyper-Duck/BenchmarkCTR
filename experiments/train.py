@@ -1,4 +1,4 @@
-"""Training script for CTR models using DeepCTR-torch."""
+"""Training script for CTR models with custom PyTorch implementations."""
 import argparse
 import os
 import sys
@@ -10,12 +10,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from deepctr_torch.inputs import DenseFeat, SparseFeat
-from deepctr_torch.models import DCN, WDL
-try:
-    from deepctr_torch.models import FFM
-except ImportError:  # pragma: no cover - optional dependency may be missing
-    FFM = None
+from models.features import DenseFeat, SparseFeat
 from models import (
     CTRDataset,
     CTNetModel,
@@ -25,6 +20,8 @@ from models import (
     FTRLProximal,
     FFMModel,
     DeepFMModel,
+    WideDeepModel,
+    DCNModel,
 )
 from sklearn.metrics import (
     average_precision_score,
@@ -38,20 +35,7 @@ from preprocess.utils import apply_preprocess, fit_preprocess, split_dataframe
 
 
 def _to_model_input(model, features, device):
-    """Convert a batch from CTRDataset to the format expected by the model."""
-
-    dnn_models = (WDL, DCN)
-    if FFM is not None:
-        dnn_models = dnn_models + (FFM,)
-
-    if isinstance(model, dnn_models):
-        tensors = []
-        for name in model.feature_index:
-            t = features[name]
-            if t.dim() == 1:
-                t = t.unsqueeze(1)
-            tensors.append(t)
-        return torch.cat(tensors, dim=1).to(device)
+    """Move batch tensors to the target device."""
 
     for k, v in features.items():
         features[k] = v.to(device)
@@ -79,36 +63,21 @@ def get_model(
             dropout=dropout,
         )
     if name.lower() == "ffm":
-        if FFM is not None:
-            return FFM(
-                linear_feature_columns=feature_columns,
-                dnn_feature_columns=feature_columns,
-                task="binary",
-                dnn_hidden_units=hidden_units,
-                l2_reg_embedding=l2,
-                device=device,
-            )
         return FFMModel(feature_columns, embedding_dim=embed_dim)
     if name.lower() == "widedeep":
-        return WDL(
-            linear_feature_columns=feature_columns,
-            dnn_feature_columns=feature_columns,
-            task="binary",
-            dnn_hidden_units=hidden_units,
-            dnn_dropout=dropout,
-            l2_reg_embedding=l2,
-            device=device,
+        return WideDeepModel(
+            feature_columns,
+            embedding_dim=embed_dim,
+            hidden_units=hidden_units,
+            dropout=dropout,
         )
     if name.lower() == "dcn":
-        return DCN(
-            linear_feature_columns=feature_columns,
-            dnn_feature_columns=feature_columns,
-            task="binary",
-            dnn_hidden_units=hidden_units,
+        return DCNModel(
+            feature_columns,
+            embedding_dim=embed_dim,
+            hidden_units=hidden_units,
             cross_num=cross_num,
-            dnn_dropout=dropout,
-            l2_reg_embedding=l2,
-            device=device,
+            dropout=dropout,
         )
     if name.lower() == "ftrl":
         return FTRLModel(feature_columns)
@@ -415,10 +384,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         required=True,
-        help=(
-            "Model name: DeepFM/WideDeep/DCN/FTRL/DMR/DIN/CTNet "
-            "(FFM if supported by your DeepCTR-Torch installation)"
-        ),
+        help="Model name: DeepFM/WideDeep/DCN/FFM/FTRL/DMR/DIN/CTNet",
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--dropout", type=float, default=0.5, help="DNN dropout")
