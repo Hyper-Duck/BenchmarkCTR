@@ -6,7 +6,7 @@ from .ctnet import CTNetModel
 from .deepfm import DeepFMModel
 from .widedeep import WideDeepModel
 from .dcn import DCNModel
-from .dataset import CTRDataset
+from .dataset import CTRDataset, CSVDataset
 from .features import SparseFeat, DenseFeat
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "WideDeepModel",
     "DCNModel",
     "CTRDataset",
+    "CSVDataset",
     "SparseFeat",
     "DenseFeat",
 ]

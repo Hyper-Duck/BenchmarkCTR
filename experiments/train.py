@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.features import DenseFeat, SparseFeat
 from models import (
     CTRDataset,
+    CSVDataset,
     CTNetModel,
     DINModel,
     DMRModel,
@@ -29,7 +30,7 @@ from sklearn.metrics import (
     log_loss,
     roc_auc_score,
 )
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 
 from preprocess.utils import apply_preprocess, fit_preprocess, split_dataframe
 
@@ -123,17 +124,22 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    df = pd.read_csv(args.data)
-    df_train, df_val, df_test = split_dataframe(df, random_state=args.seed)
+    if args.train_data and args.lazy_chunk_size > 0:
+        sample_df = pd.read_csv(args.train_data, nrows=100)
+        df_train = df_val = df_test = None
+    else:
+        df = pd.read_csv(args.data)
+        df_train, df_val, df_test = split_dataframe(df, random_state=args.seed)
 
-    numeric_cols = [c for c in df.columns if c.startswith("I")]
-    categorical_cols = [c for c in df.columns if c.startswith("C")]
+    df_cols = sample_df if args.train_data and args.lazy_chunk_size > 0 else df
+    numeric_cols = [c for c in df_cols.columns if c.startswith("I")]
+    categorical_cols = [c for c in df_cols.columns if c.startswith("C")]
     if not numeric_cols and not categorical_cols:
         exclude_cols = {"click", "label", "treatment", "conversion", "visit"}
-        for col in df.columns:
+        for col in df_cols.columns:
             if col.lower() in exclude_cols:
                 continue
-            if pd.api.types.is_numeric_dtype(df[col]):
+            if pd.api.types.is_numeric_dtype(df_cols[col]):
                 numeric_cols.append(col)
             else:
                 categorical_cols.append(col)
@@ -141,7 +147,7 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
     label_candidates = ["click", "label", "conversion", "visit"]
     label_col = None
     for name in label_candidates:
-        if name in df.columns:
+        if name in df_cols.columns:
             label_col = name
             break
     if label_col is None:
@@ -150,28 +156,52 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
             + ", ".join(label_candidates)
         )
 
-    df_train, scaler, rare_maps = fit_preprocess(df_train, numeric_cols, categorical_cols)
-    df_val = apply_preprocess(df_val, numeric_cols, categorical_cols, scaler, rare_maps)
-    df_test = apply_preprocess(df_test, numeric_cols, categorical_cols, scaler, rare_maps)
+    if args.train_data and args.lazy_chunk_size > 0:
+        vocab_size = {col: sample_df[col].nunique() + 1 for col in categorical_cols}
+        feature_columns = [DenseFeat(col, 1) for col in numeric_cols]
+        hidden_units = [int(x) for x in str(args.dnn_hidden_units).replace(",", " ").split() if x]
+        feature_columns += [
+            SparseFeat(col, vocabulary_size=vocab_size[col], embedding_dim=args.embed_dim)
+            for col in categorical_cols
+        ]
 
-    # simple vocab size assumption
-    vocab_size = {col: df_train[col].nunique() + 1 for col in categorical_cols}
+        train_dataset = CSVDataset(args.train_data, feature_columns, label_name=label_col, chunksize=args.lazy_chunk_size)
+        val_dataset = CSVDataset(
+            args.val_data,
+            feature_columns,
+            label_name=label_col,
+            cate_mapping=train_dataset.cate_maps,
+            chunksize=args.lazy_chunk_size,
+        )
+        test_dataset = CSVDataset(
+            args.test_data,
+            feature_columns,
+            label_name=label_col,
+            cate_mapping=train_dataset.cate_maps,
+            chunksize=args.lazy_chunk_size,
+        )
+    else:
+        df_train, scaler, rare_maps = fit_preprocess(df_train, numeric_cols, categorical_cols)
+        df_val = apply_preprocess(df_val, numeric_cols, categorical_cols, scaler, rare_maps)
+        df_test = apply_preprocess(df_test, numeric_cols, categorical_cols, scaler, rare_maps)
 
-    feature_columns = [DenseFeat(col, 1) for col in numeric_cols]
-    hidden_units = [int(x) for x in str(args.dnn_hidden_units).replace(",", " ").split() if x]
+        vocab_size = {col: df_train[col].nunique() + 1 for col in categorical_cols}
 
-    feature_columns += [
-        SparseFeat(col, vocabulary_size=vocab_size[col], embedding_dim=args.embed_dim)
-        for col in categorical_cols
-    ]
+        feature_columns = [DenseFeat(col, 1) for col in numeric_cols]
+        hidden_units = [int(x) for x in str(args.dnn_hidden_units).replace(",", " ").split() if x]
 
-    train_dataset = CTRDataset(df_train, feature_columns, label_name=label_col)
-    val_dataset = CTRDataset(
-        df_val, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
-    )
-    test_dataset = CTRDataset(
-        df_test, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
-    )
+        feature_columns += [
+            SparseFeat(col, vocabulary_size=vocab_size[col], embedding_dim=args.embed_dim)
+            for col in categorical_cols
+        ]
+
+        train_dataset = CTRDataset(df_train, feature_columns, label_name=label_col)
+        val_dataset = CTRDataset(
+            df_val, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
+        )
+        test_dataset = CTRDataset(
+            df_test, feature_columns, label_name=label_col, cate_mapping=train_dataset.cate_maps
+        )
 
     loader_gen = torch.Generator()
     loader_gen.manual_seed(args.seed)
@@ -179,10 +209,11 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
     pin_memory = True
     batch_size = 512
 
+    shuffle_train = not isinstance(train_dataset, IterableDataset)
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle_train,
         num_workers=num_workers,
         pin_memory=pin_memory,
         generator=loader_gen,
@@ -425,6 +456,30 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Attention hidden size for DIN",
+    )
+    parser.add_argument(
+        "--lazy-chunk-size",
+        type=int,
+        default=0,
+        help="If > 0, read CSV lazily with this chunk size",
+    )
+    parser.add_argument(
+        "--train-data",
+        type=str,
+        default=None,
+        help="Path to preprocessed training CSV for lazy mode",
+    )
+    parser.add_argument(
+        "--val-data",
+        type=str,
+        default=None,
+        help="Path to validation CSV for lazy mode",
+    )
+    parser.add_argument(
+        "--test-data",
+        type=str,
+        default=None,
+        help="Path to test CSV for lazy mode",
     )
     parser.add_argument("--alpha", type=float, default=0.1, help="FTRL alpha")
     parser.add_argument("--beta", type=float, default=1.0, help="FTRL beta")
