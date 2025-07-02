@@ -74,3 +74,9 @@ foreach($a in @(0.01,0.05,0.1)) {
     --l2 1e-5 `
     --output "outputs/ftrl_a.csv"
 }
+
+for dropout in 0.3 0.5 0.7; do
+   for l2 in 1e-6 1e-5 1e-4; do
+        python3 experiments/train.py --data data/criteo.csv --epochs 3 --seed 2025 --lazy-chunk-size 10000 --model DeepFM --embed-dim 8 --dropout $dropout --l2 $l2 --output outputs/deepfm_d_l2.csv;
+    done; 
+done

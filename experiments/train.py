@@ -205,9 +205,9 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
 
     loader_gen = torch.Generator()
     loader_gen.manual_seed(args.seed)
-    num_workers = min(8, os.cpu_count())
+    num_workers = min(12, os.cpu_count())
     pin_memory = True
-    batch_size = 512
+    batch_size = 2048
 
     shuffle_train = not isinstance(train_dataset, IterableDataset)
     train_loader = DataLoader(
