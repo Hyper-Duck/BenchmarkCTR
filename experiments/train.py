@@ -208,7 +208,7 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
     loader_gen.manual_seed(args.seed)
     num_workers = min(16, os.cpu_count())
     pin_memory = True
-    batch_size = 2048
+    batch_size = 512
 
     train_loader = DataLoader(
         train_dataset,
