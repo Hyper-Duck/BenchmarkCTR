@@ -175,7 +175,7 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
 
     loader_gen = torch.Generator()
     loader_gen.manual_seed(args.seed)
-    num_workers = min(16, os.cpu_count())
+    num_workers = min(8, os.cpu_count())
     pin_memory = True
     batch_size = 512
 

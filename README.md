@@ -16,7 +16,7 @@ Baseline CTR Model Comparison
 7. DIN (Deep Interest Network)
 8. CTNet (Continual Transfer Network)
 
-示例训练脚本 `experiments/train.py` 提供 `--model` 参数，可直接选择 `DeepFM`、`WideDeep` 或 `DCN` 进行实验。脚本支持指定学习率、L2 正则化和 Dropout，并可通过 `--seed` 设置随机种子以复现结果，训练过程中会在 `--checkpoint-dir` 指定目录下按 epoch 保存模型，并将每个 epoch 的验证指标写入 `--log-file` 指定的 CSV。
+训练脚本 `experiments/train.py` 提供 `--model` 参数。脚本支持指定学习率、L2 正则化和 Dropout，并可通过 `--seed` 设置随机种子以复现结果，训练过程中会在 `--checkpoint-dir` 指定目录下按 epoch 保存模型，并将每个 epoch 的验证指标写入 `--log-file` 指定的 CSV。
 
 ## 数据预处理
 - **连续特征缺失**: 统一填充为 0, 并增加二元指示特征。
@@ -29,7 +29,6 @@ Baseline CTR Model Comparison
 
 ## 实验实现
 - 框架: Python + PyTorch
-- Wide & Deep 与 DCN 均由本项目自行实现，无需依赖 DeepCTR
 - 训练参数:
   - `batch_size = 1024`
   - `embedding_dim = 8`
