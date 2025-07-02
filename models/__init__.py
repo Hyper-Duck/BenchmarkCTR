@@ -4,7 +4,10 @@ from .dmr import DMRModel
 from .din import DINModel
 from .ctnet import CTNetModel
 from .deepfm import DeepFMModel
+from .widedeep import WideDeepModel
+from .dcn import DCNModel
 from .dataset import CTRDataset
+from .features import SparseFeat, DenseFeat
 
 __all__ = [
     "FTRLModel",
@@ -14,5 +17,9 @@ __all__ = [
     "DINModel",
     "CTNetModel",
     "DeepFMModel",
+    "WideDeepModel",
+    "DCNModel",
     "CTRDataset",
+    "SparseFeat",
+    "DenseFeat",
 ]

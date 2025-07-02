@@ -2,7 +2,7 @@ import math
 from typing import List
 import torch
 from torch import nn
-from deepctr_torch.inputs import SparseFeat, DenseFeat
+from .features import SparseFeat, DenseFeat
 
 
 class FFMModel(nn.Module):
