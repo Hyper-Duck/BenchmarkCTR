@@ -1,13 +1,14 @@
+import os
 import torch
 import pandas as pd
 from torch.utils.data import Dataset, IterableDataset
 from .features import SparseFeat, DenseFeat
 
 class CTRDataset(Dataset):
-    """Simple Dataset turning dataframe rows into feature dicts for models."""
+    """Dataset that stores all feature columns as tensors for fast loading."""
 
     def __init__(self, df, feature_columns, label_name="click", cate_mapping=None):
-        self.df = df.reset_index(drop=True)
+        df = df.reset_index(drop=True)
         self.feature_columns = feature_columns
         self.label = label_name
         self.sparse_cols = [f.name for f in feature_columns if isinstance(f, SparseFeat)]
@@ -18,22 +19,56 @@ class CTRDataset(Dataset):
             if cate_mapping and col in cate_mapping:
                 self.cate_maps[col] = cate_mapping[col]
             else:
-                cats = self.df[col].astype("category").cat.categories
+                cats = df[col].astype("category").cat.categories
                 self.cate_maps[col] = {v: i + 1 for i, v in enumerate(cats)}
-            self.df[col] = self.df[col].map(self.cate_maps[col]).fillna(0).astype("int64")
+            df[col] = df[col].map(self.cate_maps[col]).fillna(0).astype("int64")
+
+        self.sparse_tensors = {
+            col: torch.tensor(df[col].values, dtype=torch.long) for col in self.sparse_cols
+        }
+        self.dense_tensors = {
+            col: torch.tensor(df[col].values, dtype=torch.float32) for col in self.dense_cols
+        }
+        self.labels = torch.tensor(df[self.label].values, dtype=torch.float32)
+        self.df = None
 
     def __len__(self):
-        return len(self.df)
+        return len(self.labels)
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        features = {}
-        for name in self.sparse_cols:
-            features[name] = torch.tensor(row[name], dtype=torch.long)
-        for name in self.dense_cols:
-            features[name] = torch.tensor(row[name], dtype=torch.float32)
-        label = torch.tensor(row[self.label], dtype=torch.float32)
+        features = {name: tensor[idx] for name, tensor in self.sparse_tensors.items()}
+        for name, tensor in self.dense_tensors.items():
+            features[name] = tensor[idx]
+        label = self.labels[idx]
         return features, label
+
+    def save(self, path: str) -> None:
+        """Serialize tensors and category maps to a file."""
+        torch.save(
+            {
+                "sparse_tensors": self.sparse_tensors,
+                "dense_tensors": self.dense_tensors,
+                "labels": self.labels,
+                "cate_maps": self.cate_maps,
+            },
+            path,
+        )
+
+    @classmethod
+    def load(cls, path: str, feature_columns, label_name: str = "click"):
+        """Load dataset previously saved with :meth:`save`."""
+        data = torch.load(path, map_location="cpu")
+        obj = cls.__new__(cls)
+        obj.feature_columns = feature_columns
+        obj.label = label_name
+        obj.sparse_cols = [f.name for f in feature_columns if isinstance(f, SparseFeat)]
+        obj.dense_cols = [f.name for f in feature_columns if isinstance(f, DenseFeat)]
+        obj.cate_maps = data["cate_maps"]
+        obj.sparse_tensors = data["sparse_tensors"]
+        obj.dense_tensors = data["dense_tensors"]
+        obj.labels = data["labels"]
+        obj.df = None
+        return obj
 
 
 class CSVDataset(IterableDataset):

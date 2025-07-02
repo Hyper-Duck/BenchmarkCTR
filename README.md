@@ -62,27 +62,28 @@ BenchmarkCTR/
 
 ### 快速开始
 1. 在 `data/` 目录放入原始 `criteo.csv` 文件。
-2. 安装依赖：
+2. 首次运行时脚本会将 `criteo.csv` 转换为同目录下的 `criteo.pt` 以加速后续加载。
+3. 安装依赖：
    ```bash
    pip install -r requirements.txt
    ```
-3. 运行示例训练脚本（以 DeepFM 为例）：
+4. 运行示例训练脚本（以 DeepFM 为例）：
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/train_metrics.csv
    ```
    训练结束后，所有传入的超参数（如 `seed`、`dnn_hidden_units` 等）会与评估指标一起
    追加写入 `--output` 指定的 CSV 文件，便于后续比较。
-4. 若需从已有模型继续训练，可传入 `--start-from-checkpoint` 并将 `--epochs`
+5. 若需从已有模型继续训练，可传入 `--start-from-checkpoint` 并将 `--epochs`
    设为额外训练的轮数（以 DeepFM 从 checkpointe poch_2 开始为例）：
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/train_metrics.csv --start-from-checkpoint outputs/checkpoints/DeepFM_epoch_2.pt
    ```
-5. 若内存受限，可事先将训练/验证/测试集分别保存为 CSV，并在训练时启用懒加载：
+6. 若内存受限，可事先将训练/验证/测试集分别保存为 CSV，并在训练时启用懒加载：
    ```bash
    python experiments/train.py --model DeepFM --train-data train.csv --val-data val.csv --test-data test.csv \
        --lazy-chunk-size 10000 --epochs 1 --output outputs/result.csv
    ```
-6. FTLR 模型与其他模型略有不同，其使用 `alpha`、`beta`、`l1` 和 `l2` 4个参数。示例训练脚本：
+7. FTLR 模型与其他模型略有不同，其使用 `alpha`、`beta`、`l1` 和 `l2` 4个参数。示例训练脚本：
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model FTRL --alpha 0.05 --beta 1.0 --l1 1.0 --l2 1e-5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/ftrl_log.csv
    ```
