@@ -128,7 +128,12 @@ def main(args: argparse.Namespace, explicit: set[str]) -> None:
         sample_df = pd.read_csv(args.train_data, nrows=100)
         df_train = df_val = df_test = None
     else:
-        df = pd.read_csv(args.data)
+        pt_path = os.path.splitext(args.data)[0] + ".pt"
+        if os.path.exists(pt_path):
+            df = torch.load(pt_path, weights_only=False)
+        else:
+            df = pd.read_csv(args.data)
+            torch.save(df, pt_path)
         df_train, df_val, df_test = split_dataframe(df, random_state=args.seed)
 
     df_cols = sample_df if args.train_data and args.lazy_chunk_size > 0 else df
