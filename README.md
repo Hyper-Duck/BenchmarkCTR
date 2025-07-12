@@ -37,7 +37,7 @@ Baseline CTR Model Comparison
   - 学习率 `lr ∈ {1e-3, 5e-4, 1e-4}`
   - L2 正则化系数 `λ ∈ {1e-3, 1e-4, 1e-5}`
   - Dropout `p ∈ {0.0, 0.2, 0.5}`
-- 通过验证集使用网格搜索或贝叶斯优化进行超参数调优。
+- 通过验证集使用网格搜索进行超参数调优。
 
 ## 评估指标
 - 主要指标: AUC, LogLoss, PR-AUC
@@ -78,12 +78,8 @@ BenchmarkCTR/
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model DeepFM --lr 1e-3 --l2 1e-5 --dropout 0.5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/train_metrics.csv --start-from-checkpoint outputs/checkpoints/DeepFM_epoch_2.pt
    ```
-6. 若内存受限，可事先将训练/验证/测试集分别保存为 CSV，并在训练时启用懒加载：
-   ```bash
-   python experiments/train.py --model DeepFM --train-data train.csv --val-data val.csv --test-data test.csv \
-       --lazy-chunk-size 10000 --epochs 1 --output outputs/result.csv
-   ```
-7. FTLR 模型与其他模型略有不同，其使用 `alpha`、`beta`、`l1` 和 `l2` 4个参数。示例训练脚本：
+6. FTLR 模型与其他模型略有不同，其使用 `alpha`、`beta`、`l1` 和 `l2` 4个参数。示例训练脚本：
    ```bash
    python experiments/train.py --data data/criteo.csv --epochs 1 --model FTRL --alpha 0.05 --beta 1.0 --l1 1.0 --l2 1e-5 --output outputs/result.csv --seed 2025 --checkpoint-dir outputs/checkpoints --log-file logs/ftrl_log.csv
    ```
+7. 实验的超参数优化运行代码示例可以在 `run.experiments.txt` 中找到。

@@ -1,7 +1,3 @@
-source venv/bin/activate
-cd ./BenchmarkCTR
-COMMON="--data data/criteo.csv --epochs 3 --lr 1e-3 --seed 2025"
-
 # Round 2a
 $COMMON = @(
   "--data";       "data/criteo.csv";        
