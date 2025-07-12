@@ -1,3 +1,8 @@
+source venv/bin/activate
+cd ./BenchmarkCTR
+COMMON="--data data/criteo.csv --epochs 3 --lr 1e-3 --seed 2025"
+
+# Round 2a
 $COMMON = @(
   "--data";       "data/criteo.csv";        
   "--epochs";     "3";
@@ -75,8 +80,24 @@ foreach($a in @(0.01,0.05,0.1)) {
     --output "outputs/ftrl_a.csv"
 }
 
-for dropout in 0.3 0.5 0.7; do
-   for l2 in 1e-6 1e-5 1e-4; do
-        python3 experiments/train.py --data data/criteo.csv --epochs 3 --seed 2025 --lazy-chunk-size 10000 --model DeepFM --embed-dim 8 --dropout $dropout --l2 $l2 --output outputs/deepfm_d_l2.csv;
-    done; 
-done
+# Round 2a
+COMMON="--data data/criteo.csv --epochs 3 --lr 1e-3 --seed 2025"
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model WideDeep       --dnn-hidden-units "256 128 64"       --dropout $dropout       --l2 $l2       --output outputs/WideDeep_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model DeepFM       --embed-dim 8       --dropout $dropout       --l2 $l2       --output outputs/DeepFM_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model DCN        --cross-num 2       --dnn-hidden-units "256 128 64"       --dropout $dropout       --l2 $l2       --output outputs/DCN_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model DIN       --attention-hidden-size 64       --dropout $dropout       --l2 $l2       --output outputs/DIN_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model DMR       --memory-hops 2       --dropout $dropout       --l2 $l2       --output outputs/DMR_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model CTNet       --conv-layers 3       --dropout $dropout       --l2 $l2       --output outputs/CTNet_d_l2.csv;   done; done
+for dropout in 0.3 0.5 0.7; do   for l2 in 1e-6 1e-5 1e-4; do     python3 experiments/train.py $COMMON       --model FFM       --embed-dim 8       --dropout $dropout       --l2 $l2       --output outputs/FFM_d_l2.csv;   done; done
+for l1 in 0.1 1.0 10.0; do  for l2 in 1e-6 1e-5 1e-4; do    python3 experiments/train.py $COMMON       --model FTRL       --alpha 0.05       --beta 1.0       --l1 $l1       --l2 $l2       --output outputs/FTRL_reg.csv;   done; done
+
+# Round 2b
+COMMON="--data data/criteo.csv --epochs 3 --seed 2025"
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model WideDeep     --dnn-hidden-units "256 128 64"     --lr $lr     --dropout 0.3     --l2 1e-6     --output outputs/WideDeep_lr.csv; done
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model DeepFM     --embed-dim 8     --lr $lr     --dropout 0.5     --l2 1e-4     --output outputs/DeepFM_lr.csv; done
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model DCN     --cross-num 2     --dnn-hidden-units "256 128 64"     --lr $lr     --dropout 0.5     --l2 1e-6     --output outputs/DCN_lr.csv; done
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model DIN     --attention-hidden-size 64     --lr $lr     --dropout 0.5     --l2 1e-6     --output outputs/DIN_lr.csv; done
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model DMR     --memory-hops 2     --lr $lr     --dropout 0.5     --l2 1e-6     --output outputs/DMR_lr.csv; done
+for lr in 5e-4 1e-3 2e-3; do  python3 experiments/train.py $COMMON     --model CTNet     --conv-layers 3     --lr $lr     --dropout 0.3     --l2 1e-6     --output outputs/CTNet_lr.csv; done
+for beta in 0.5 1.0 2.0; do   python3 experiments/train.py $COMMON     --model FTRL     --alpha 0.05     --beta $beta     --l1 0.1     --l2 1e-6     --output outputs/ftrl_beta.csv; done
+
